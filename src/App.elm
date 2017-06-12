@@ -4,9 +4,11 @@ import Color
 import Element exposing (..)
 import Element.Attributes exposing (..)
 import Html exposing (Html)
+import Http
 import Element.Events exposing (onWithOptions)
-import Json.Decode as Json
+import Json.Decode as Decode
 import Navigation exposing (programWithFlags, Location)
+import RemoteData exposing (WebData)
 import Style exposing (..)
 import Style.Color as StyleColor
 import Style.Border as Border
@@ -19,8 +21,8 @@ type Route
     | MeetupsRoute
 
 
-route : Parser (Route -> a) a
-route =
+parseRoute : Parser (Route -> a) a
+parseRoute =
     oneOf
         [ UrlParser.map EventsRoute (s "")
         , UrlParser.map MeetupsRoute (s "meetups")
@@ -28,24 +30,70 @@ route =
 
 
 type alias Model =
-    { message : String
-    , currentRoute : Maybe Route
+    { currentRoute : Maybe Route
+    , events : WebData Events
+    }
+
+
+type alias Events =
+    List Event
+
+
+type alias Event =
+    { id : Int
+    , title : String
     }
 
 
 init : () -> Location -> ( Model, Cmd Msg )
 init () location =
-    ( { message = "Your Elm App is working!"
-      , currentRoute = parsePath route location
-      }
-    , Cmd.none
-    )
+    update (UrlChange location)
+        ({ currentRoute = Nothing
+         , events = RemoteData.NotAsked
+         }
+        )
 
 
 type Msg
     = NoOp
     | UrlChange Location
     | NavigateTo String
+    | EventsResponse (WebData Events)
+
+
+getEvents : Cmd Msg
+getEvents =
+    Http.get "https://api.elmlog.com/events" decodeEvents
+        |> RemoteData.sendRequest
+        |> Cmd.map EventsResponse
+
+
+decodeEvents : Decode.Decoder Events
+decodeEvents =
+    Decode.list <|
+        Decode.map2 Event
+            (Decode.field "id" Decode.int)
+            (Decode.field "title" Decode.string)
+
+
+routeLoadData : Maybe Route -> Cmd Msg
+routeLoadData route =
+    case route of
+        Just EventsRoute ->
+            getEvents
+
+        _ ->
+            Cmd.none
+
+
+routeLoadModel : Model -> Model
+routeLoadModel model =
+    case model.currentRoute of
+        Just EventsRoute ->
+            { model | events = RemoteData.Loading }
+
+        _ ->
+            model
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -55,7 +103,16 @@ update msg model =
             ( model, Navigation.newUrl link )
 
         UrlChange location ->
-            ( { model | currentRoute = parsePath route location }, Cmd.none )
+            let
+                route =
+                    parsePath parseRoute location
+            in
+                ( routeLoadModel { model | currentRoute = route }, routeLoadData route )
+
+        EventsResponse response ->
+            ( { model | events = response }
+            , Cmd.none
+            )
 
         _ ->
             ( model, Cmd.none )
@@ -102,7 +159,7 @@ stopPropagation =
         { stopPropagation = False
         , preventDefault = True
         }
-        (Json.map NavigateTo <| Json.at [ "target", "href" ] Json.string)
+        (Decode.map NavigateTo <| Decode.at [ "target", "href" ] Decode.string)
 
 
 menuItem url label =
@@ -118,12 +175,35 @@ navigation =
         ]
 
 
-contents currentRoute =
+eventView event =
+    column None
+        []
+        [ text (toString event.id)
+        , text event.title
+        ]
+
+
+eventsView events =
+    case events of
+        RemoteData.NotAsked ->
+            text "Initialising."
+
+        RemoteData.Loading ->
+            text "Loading."
+
+        RemoteData.Failure err ->
+            text ("Error: " ++ toString err)
+
+        RemoteData.Success events ->
+            column None [] <| List.map eventView events
+
+
+contents model =
     el None
         [ width (fill 1) ]
-        (case currentRoute of
+        (case model.currentRoute of
             Just EventsRoute ->
-                text "Events"
+                eventsView model.events
 
             Just MeetupsRoute ->
                 text "Meetups"
@@ -139,7 +219,7 @@ view model =
         row None
             [ height (percent 100), width (percent 100) ]
             [ navigation
-            , contents model.currentRoute
+            , contents model
             ]
 
 
