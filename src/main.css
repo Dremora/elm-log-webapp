@@ -1,0 +1,12 @@
+body {
+  font-family: sans-serif !important;
+}
+
+body, #root, .style-elements-root {
+  height: 100vh;
+}
+
+.style-elements-root {
+  display: flex;
+  align-items: stretch;
+}
