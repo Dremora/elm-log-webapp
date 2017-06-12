@@ -4,6 +4,9 @@ import Color
 import Element exposing (..)
 import Element.Attributes exposing (..)
 import Html exposing (Html)
+import Element.Events exposing (onWithOptions)
+import Json.Decode as Json
+import Navigation exposing (programWithFlags, Location)
 import Style exposing (..)
 import Style.Color as StyleColor
 import Style.Border as Border
@@ -15,18 +18,28 @@ type alias Model =
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init () =
+init : () -> Location -> ( Model, Cmd Msg )
+init () location =
     ( { message = "Your Elm App is working!" }, Cmd.none )
 
 
 type Msg
     = NoOp
+    | UrlChange Location
+    | NavigateTo String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        NavigateTo link ->
+            ( model, Navigation.newUrl link )
+
+        UrlChange location ->
+            ( model, always Cmd.none (Debug.log "location" location) )
+
+        _ ->
+            ( model, Cmd.none )
 
 
 type Styles
@@ -65,12 +78,20 @@ menuHeading =
     el MenuHeading [ paddingXY 10 11 ] (text "Community")
 
 
+stopPropagation =
+    onWithOptions "click"
+        { stopPropagation = False
+        , preventDefault = True
+        }
+        (Json.map NavigateTo <| Json.at [ "target", "href" ] Json.string)
+
+
 navigation =
     column Navigation
         [ width (px 150) ]
         [ menuHeading
-        , el MenuItem [ paddingXY 10 11 ] (text "Events")
-        , el MenuItem [ paddingXY 10 11 ] (text "Meetups")
+        , link ("/") <| el MenuItem [ stopPropagation, paddingXY 10 11 ] (text "Events")
+        , link ("/meetups/") <| el MenuItem [ stopPropagation, paddingXY 10 11 ] (text "Meetups")
         ]
 
 
@@ -86,7 +107,7 @@ view model =
 
 main : Program () Model Msg
 main =
-    Html.programWithFlags
+    programWithFlags UrlChange
         { view = view
         , init = init
         , update = update
