@@ -11,16 +11,35 @@ import Style exposing (..)
 import Style.Color as StyleColor
 import Style.Border as Border
 import Style.Font as Font
+import UrlParser exposing (Parser, (</>), s, oneOf, parsePath)
+
+
+type Route
+    = EventsRoute
+    | MeetupsRoute
+
+
+route : Parser (Route -> a) a
+route =
+    oneOf
+        [ UrlParser.map EventsRoute (s "")
+        , UrlParser.map MeetupsRoute (s "meetups")
+        ]
 
 
 type alias Model =
     { message : String
+    , currentRoute : Maybe Route
     }
 
 
 init : () -> Location -> ( Model, Cmd Msg )
 init () location =
-    ( { message = "Your Elm App is working!" }, Cmd.none )
+    ( { message = "Your Elm App is working!"
+      , currentRoute = parsePath route location
+      }
+    , Cmd.none
+    )
 
 
 type Msg
@@ -36,7 +55,7 @@ update msg model =
             ( model, Navigation.newUrl link )
 
         UrlChange location ->
-            ( model, always Cmd.none (Debug.log "location" location) )
+            ( { model | currentRoute = parsePath route location }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -95,14 +114,29 @@ navigation =
         ]
 
 
-contents =
-    el None [ width (fill 1) ] (text "Contents")
+contents currentRoute =
+    el None
+        [ width (fill 1) ]
+        (case currentRoute of
+            Just EventsRoute ->
+                text "Events"
+
+            Just MeetupsRoute ->
+                text "Meetups"
+
+            Nothing ->
+                text "Not found"
+        )
 
 
 view : Model -> Html Msg
 view model =
     Element.root stylesheet <|
-        row None [ height (percent 100), width (percent 100) ] [ navigation, contents ]
+        row None
+            [ height (percent 100), width (percent 100) ]
+            [ navigation
+            , contents model.currentRoute
+            ]
 
 
 main : Program () Model Msg
