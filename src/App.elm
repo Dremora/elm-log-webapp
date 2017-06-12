@@ -105,12 +105,16 @@ stopPropagation =
         (Json.map NavigateTo <| Json.at [ "target", "href" ] Json.string)
 
 
+menuItem url label =
+    link url <| el MenuItem [ stopPropagation, paddingXY 10 11 ] (text label)
+
+
 navigation =
     column Navigation
         [ width (px 150) ]
         [ menuHeading
-        , link ("/") <| el MenuItem [ stopPropagation, paddingXY 10 11 ] (text "Events")
-        , link ("/meetups/") <| el MenuItem [ stopPropagation, paddingXY 10 11 ] (text "Meetups")
+        , menuItem "/" "Events"
+        , menuItem "/meetups/" "Meetups"
         ]
 
 
