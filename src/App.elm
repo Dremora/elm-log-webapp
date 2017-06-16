@@ -6,11 +6,12 @@ import Element.Attributes exposing (..)
 import Html exposing (Html)
 import Http
 import Element.Events exposing (onWithOptions)
+import Json.Encode as Encode
 import Json.Decode as Decode
 import Navigation exposing (programWithFlags, Location)
 import RemoteData exposing (WebData)
 import Style exposing (..)
-import Style.Color as StyleColor
+import Style.Color as Color
 import Style.Border as Border
 import Style.Font as Font
 import UrlParser exposing (Parser, (</>), s, oneOf, parsePath)
@@ -42,6 +43,12 @@ type alias Events =
 type alias Event =
     { id : Int
     , title : String
+    , startsAt : String
+    , city : Maybe String
+    , country : Maybe String
+    , host : String
+    , url : String
+    , description : String
     }
 
 
@@ -71,9 +78,15 @@ getEvents =
 decodeEvents : Decode.Decoder Events
 decodeEvents =
     Decode.list <|
-        Decode.map2 Event
+        Decode.map8 Event
             (Decode.field "id" Decode.int)
             (Decode.field "title" Decode.string)
+            (Decode.field "local_starts_at" Decode.string)
+            (Decode.maybe <| Decode.field "city" Decode.string)
+            (Decode.maybe <| Decode.field "country" Decode.string)
+            (Decode.field "host" Decode.string)
+            (Decode.field "url" Decode.string)
+            (Decode.field "description" Decode.string)
 
 
 routeLoadData : Maybe Route -> Cmd Msg
@@ -123,6 +136,13 @@ type Styles
     | Navigation
     | MenuHeading
     | MenuItem
+    | Heading
+    | PageHeader
+    | EntryHeader
+    | EntryStartsAt
+    | EntryLocation
+    | EntryDescription
+    | EventLink
 
 
 stylesheet : StyleSheet Styles variation
@@ -130,22 +150,66 @@ stylesheet =
     Style.stylesheet
         [ style None []
         , style Navigation
-            [ StyleColor.background (Color.rgb 25 24 24) ]
+            [ Color.background (Color.rgb 25 24 24) ]
         , style MenuHeading
-            [ StyleColor.background (Color.rgb 31 141 214)
-            , StyleColor.text (Color.rgb 255 255 255)
+            [ Color.background (Color.rgb 31 141 214)
+            , Color.text (Color.rgb 255 255 255)
             , Font.size 18
             , Font.uppercase
             ]
         , style MenuItem
-            [ StyleColor.text (Color.rgb 153 153 153)
-            , StyleColor.border (Color.rgb 51 51 51)
+            [ Color.text (Color.rgb 153 153 153)
+            , Color.border (Color.rgb 51 51 51)
             , Border.bottom 1
             , Border.solid
             , hover
-                [ StyleColor.background (Color.rgb 51 51 51)
+                [ Color.background (Color.rgb 51 51 51)
                 , cursor "pointer"
                 ]
+            ]
+        , style Heading
+            [ Color.text (Color.rgb 51 51 51)
+            , Font.size 48
+            , Font.weight 300
+            , Font.center
+            , paddingTopHint 54
+            , paddingBottomHint 12
+            , Border.bottom 1
+            , Color.border (Color.rgb 238 238 238)
+            ]
+        , style PageHeader
+            [ Color.text (Color.rgb 119 119 119)
+            , Font.size 32
+            , Font.weight 700
+            ]
+        , style EntryHeader
+            [ Color.text (Color.rgb 136 136 136)
+            , Font.size 24
+            , Font.weight 300
+            ]
+        , style EntryStartsAt
+            [ Color.text (Color.rgb 119 119 119)
+            , Font.size 18.72
+            , Font.weight 700
+            ]
+        , style EntryLocation
+            [ Color.text (Color.rgb 119 119 119)
+            , Font.size 16
+            , Font.weight 700
+            ]
+        , style EntryDescription
+            [ Color.text (Color.rgb 119 119 119)
+            , Font.size 16
+            , Font.lineHeight (25.6 / 16)
+            ]
+        , style EventLink
+            [ Color.text Color.white
+            , Color.background (Color.rgb 0 120 231)
+            , paddingTopHint 8
+            , paddingBottomHint 8
+            , paddingLeftHint 16
+            , paddingRightHint 16
+            , Border.rounded 2
             ]
         ]
 
@@ -168,40 +232,64 @@ menuItem url label =
 
 navigation =
     column Navigation
-        [ width (px 150) ]
+        [ width (px 150), inlineStyle [ ( "flex-shrink", "0" ) ] ]
         [ menuHeading
         , menuItem "/" "Events"
         , menuItem "/meetups/" "Meetups"
         ]
 
 
+eventLocationView event =
+    case ( event.city, event.country ) of
+        ( Just city, Just country ) ->
+            city ++ ", " ++ country ++ " (" ++ event.host ++ ")"
+
+        _ ->
+            event.host
+
+
+buttonLink title url =
+    link url <| el EventLink [] (text title)
+
+
 eventView event =
     column None
-        []
-        [ text (toString event.id)
-        , text event.title
+        [ inlineStyle [ ( "flex-shrink", "0" ) ] ]
+        [ node "h3" <| el EntryHeader [ paddingTop 46 ] <| text event.title
+        , el EntryStartsAt [ paddingTop 25 ] <| text event.startsAt
+        , el EntryLocation [ paddingTop 28 ] <| text <| eventLocationView event
+        , el EntryDescription [ paddingTop 26, property "innerHTML" (Encode.string event.description) ] <| text ""
+        , row None [ paddingTop 41 ] [ buttonLink "View on Meetup.com" event.url ]
         ]
 
 
 eventsView events =
-    case events of
-        RemoteData.NotAsked ->
-            text "Initialising."
+    listView
+        [ el PageHeader [] (text "Elm Events")
+        , case events of
+            RemoteData.NotAsked ->
+                text "Initialising."
 
-        RemoteData.Loading ->
-            text "Loading."
+            RemoteData.Loading ->
+                text "Loading."
 
-        RemoteData.Failure err ->
-            text ("Error: " ++ toString err)
+            RemoteData.Failure err ->
+                text ("Error: " ++ toString err)
 
-        RemoteData.Success events ->
-            column None [] <| List.map eventView events
+            RemoteData.Success events ->
+                column None [] <| List.map eventView events
+        ]
+
+
+listView =
+    column None [ paddingXY 165 19 ]
 
 
 contents model =
-    el None
-        [ width (fill 1) ]
-        (case model.currentRoute of
+    column None
+        [ width (fill 1), inlineStyle [ ( "overflow", "auto" ) ] ]
+        [ node "h1" <| el Heading [] <| text "Elm Log"
+        , (case model.currentRoute of
             Just EventsRoute ->
                 eventsView model.events
 
@@ -210,7 +298,8 @@ contents model =
 
             Nothing ->
                 text "Not found"
-        )
+          )
+        ]
 
 
 view : Model -> Html Msg
