@@ -232,7 +232,7 @@ menuItem url label =
 
 navigation =
     column Navigation
-        [ width (px 150), inlineStyle [ ( "flex-shrink", "0" ) ] ]
+        [ width (px 150) ]
         [ menuHeading
         , menuItem "/" "Events"
         , menuItem "/meetups/" "Meetups"
@@ -253,8 +253,8 @@ buttonLink title url =
 
 
 eventView event =
-    column None
-        [ inlineStyle [ ( "flex-shrink", "0" ) ] ]
+    column Entry
+        []
         [ node "h3" <| el EntryHeader [ paddingTop 46 ] <| text event.title
         , el EntryStartsAt [ paddingTop 25 ] <| text event.startsAt
         , el EntryLocation [ paddingTop 28 ] <| text <| eventLocationView event
@@ -288,7 +288,7 @@ listView =
 contents model =
     column None
         [ width (fill 1), inlineStyle [ ( "overflow", "auto" ) ] ]
-        [ node "h1" <| el Heading [] <| text "Elm Log"
+        [ node "h1" <| el Heading [ inlineStyle [ ( "margin", "0" ) ] ] <| text "Elm Log"
         , (case model.currentRoute of
             Just EventsRoute ->
                 eventsView model.events
