@@ -138,11 +138,13 @@ type Styles
     | MenuItem
     | Heading
     | PageHeader
+    | Entry
     | EntryHeader
     | EntryStartsAt
     | EntryLocation
     | EntryDescription
     | EventLink
+    | EntryFooter
 
 
 stylesheet : StyleSheet Styles variation
@@ -182,6 +184,11 @@ stylesheet =
             , Font.size 32
             , Font.weight 700
             ]
+        , style Entry
+            [ Border.bottom 1
+            , Border.solid
+            , Color.border (Color.rgb 238 238 238)
+            ]
         , style EntryHeader
             [ Color.text (Color.rgb 136 136 136)
             , Font.size 24
@@ -205,12 +212,14 @@ stylesheet =
         , style EventLink
             [ Color.text Color.white
             , Color.background (Color.rgb 0 120 231)
-            , paddingTopHint 8
-            , paddingBottomHint 8
+            , paddingTopHint 9
+            , paddingBottomHint 9
             , paddingLeftHint 16
             , paddingRightHint 16
             , Border.rounded 2
             ]
+        , style EntryFooter
+            [ paddingBottomHint 16 ]
         ]
 
 
@@ -259,7 +268,7 @@ eventView event =
         , el EntryStartsAt [ paddingTop 25 ] <| text event.startsAt
         , el EntryLocation [ paddingTop 28 ] <| text <| eventLocationView event
         , el EntryDescription [ paddingTop 26, property "innerHTML" (Encode.string event.description) ] <| text ""
-        , row None [ paddingTop 41 ] [ buttonLink "View on Meetup.com" event.url ]
+        , row EntryFooter [ paddingTop 41 ] [ buttonLink "View on Meetup.com" event.url ]
         ]
 
 
@@ -277,7 +286,7 @@ eventsView events =
                 text ("Error: " ++ toString err)
 
             RemoteData.Success events ->
-                column None [] <| List.map eventView events
+                column None [ spacing 4, paddingBottom 31 ] <| List.map eventView events
         ]
 
 
